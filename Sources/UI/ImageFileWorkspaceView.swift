@@ -174,12 +174,32 @@ private struct ImageFileWorkspaceView: View {
         VStack(alignment: .leading, spacing: 14) {
             resizeControls
             slider(l10n.s.mediaQuality, value: binding(\.quality, recordUndo: false), range: 0.05...1)
-            Toggle(l10n.s.mediaSizingFileSize, isOn: Binding(get: { model.edit.targetBytes > 0 }, set: { enabled in model.change { $0.targetBytes = enabled ? 10_000_000 : 0 } }))
-            if model.edit.targetBytes > 0 {
-                TextField("MB", value: Binding(get: { Double(model.edit.targetBytes)/1_000_000 }, set: { value in model.change { $0.targetBytes = value.isFinite && value >= 0 && value <= 10000 ? Int64(value*1_000_000) : 0 } }), format: .number)
-                    .accessibilityLabel(l10n.s.mediaSizingFileSize)
-            }
+            targetSizeControls
         }
+    }
+    @ViewBuilder private var targetSizeControls: some View {
+        Toggle(l10n.s.mediaSizingFileSize, isOn: targetSizeEnabled)
+        if model.edit.targetBytes > 0 {
+            TextField("MB", value: targetMegabytes, format: .number)
+                .accessibilityLabel(l10n.s.mediaSizingFileSize)
+        }
+    }
+    private var targetSizeEnabled: Binding<Bool> {
+        Binding(get: { model.edit.targetBytes > 0 }, set: { enabled in
+            let bytes: Int64 = enabled ? 10_000_000 : 0
+            model.change { $0.targetBytes = bytes }
+        })
+    }
+    private var targetMegabytes: Binding<Double> {
+        Binding(get: { Double(model.edit.targetBytes) / 1_000_000 }, set: { value in
+            let bytes: Int64
+            if value.isFinite && value >= 0 && value <= 10_000 {
+                bytes = Int64(value * 1_000_000)
+            } else {
+                bytes = 0
+            }
+            model.change { $0.targetBytes = bytes }
+        })
     }
     private var editControls: some View {
         VStack(alignment: .leading, spacing: 14) {

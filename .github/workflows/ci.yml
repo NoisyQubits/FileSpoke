@@ -17,7 +17,27 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build prerequisites
         run: brew install cmake pkgconf
-      - name: Build app and pinned media engines
+      - name: Identify Apple toolchain
+        id: toolchain
+        run: echo "version=$(xcodebuild -version | shasum -a 256 | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+      - name: Restore pinned media engines
+        id: media-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .build/media-engines/runtime
+          key: media-engines-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.version }}-${{ hashFiles('Tools/build-media-engines.py', 'Tools/media-build-requirements.txt', 'Tools/svg-renderer.cpp') }}
+      - name: Build pinned media engines
+        if: steps.media-cache.outputs.cache-hit != 'true'
+        run: python3 Tools/build-media-engines.py
+      - name: Cache verified media engines
+        if: steps.media-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .build/media-engines/runtime
+          key: media-engines-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.version }}-${{ hashFiles('Tools/build-media-engines.py', 'Tools/media-build-requirements.txt', 'Tools/svg-renderer.cpp') }}
+      - name: Build app with pinned engines
+        env:
+          FILESPOKE_ENGINE_RUNTIME: .build/media-engines/runtime
         run: ./build.sh
       - name: Upload engine build logs after a failure
         if: failure()
