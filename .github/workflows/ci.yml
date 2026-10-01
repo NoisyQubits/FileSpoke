@@ -1,0 +1,33 @@
+name: Build and smoke test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build prerequisites
+        run: brew install cmake pkgconf
+      - name: Build app and pinned media engines
+        run: ./build.sh
+      - name: Run packaged app smoke test
+        run: build/FileSpoke.app/Contents/MacOS/FileSpoke --selftest
+      - name: Verify bundled engines and signature
+        run: |
+          python3 Tools/verify-media-engines.py build/FileSpoke.app/Contents/Resources/MediaEngines
+          codesign --verify --deep --strict build/FileSpoke.app
+      - name: Check distributable metadata
+        run: |
+          if grep -qE '/Users/|/private/var/' build/FileSpoke.app/Contents/Resources/MediaEngines/manifest.json; then
+            echo 'Local build paths leaked into the engine manifest' >&2
+            exit 1
+          fi
