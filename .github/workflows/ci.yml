@@ -19,6 +19,13 @@ jobs:
         run: brew install cmake pkgconf
       - name: Build app and pinned media engines
         run: ./build.sh
+      - name: Upload engine build logs after a failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: media-engine-build-logs
+          path: .build/media-engines/logs/
+          if-no-files-found: ignore
       - name: Run packaged app smoke test
         run: build/FileSpoke.app/Contents/MacOS/FileSpoke --selftest
       - name: Verify bundled engines and signature

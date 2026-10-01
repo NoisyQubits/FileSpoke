@@ -32,7 +32,10 @@ and source; do not remove macOS quarantine globally.
 ## Build and verify
 
 The default build fetches seven pinned, checksum-verified media projects and
-builds their Apple Silicon/macOS 14 binaries locally. You need Xcode Command Line
+builds their Apple Silicon/macOS 14 binaries locally. The exact source archives
+are mirrored in the [engine source release](https://github.com/NoisyQubits/FileSpoke/releases/tag/engine-sources-v1);
+the build verifies their SHA-256 hashes and records the original upstream URLs.
+You need Xcode Command Line
 Tools, Python 3, CMake, and pkgconf. Meson and Ninja are pinned in
 `Tools/media-build-requirements.txt` and installed only into the local build
 directory. The installed app needs none of these tools.

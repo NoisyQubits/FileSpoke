@@ -38,6 +38,7 @@ SOURCES = [
 
 
 AOM_ARCHIVE_SHA256 = "dc0e5c1e2fabc7756fda36443936f0ca99e96e5d9ba413f992f660fd035e7c2d"
+SOURCE_ASSET_BASE = "https://github.com/NoisyQubits/FileSpoke/releases/download/engine-sources-v1"
 
 def capture(*args):
     return subprocess.check_output(args, text=True).strip()
@@ -55,7 +56,7 @@ def main():
     args = parser.parse_args()
     if platform.system() != "Darwin" or platform.machine() != "arm64":
         raise SystemExit("This recipe targets Apple Silicon macOS.")
-    for tool in ["cmake", "pkg-config", "clang", "make", "git"]:
+    for tool in ["cmake", "pkg-config", "clang", "make", "curl"]:
         if not shutil.which(tool):
             raise SystemExit(f"Missing build prerequisite: {tool}")
     work = args.work.resolve()
@@ -79,7 +80,8 @@ def main():
             process = subprocess.run(list(map(str, argv)), cwd=cwd, env=env,
                                      stdout=out, stderr=subprocess.STDOUT)
         if process.returncode:
-            raise RuntimeError(f"Build failed: {argv[0]}; inspect {log}")
+            tail = "\n".join(log.read_text(errors="replace").splitlines()[-30:])
+            raise RuntimeError(f"Build failed: {argv[0]}; inspect {log}\n{tail}")
 
     # Pinned build tools live only in the generated work directory, never in the app.
     build_tools = work / "build-tools"
@@ -96,26 +98,19 @@ def main():
         source = work / "sources" / label
         archive = work / "downloads" / (label + (".tar.xz" if name == "ffmpeg" else ".tar.gz"))
         print(f"Building {label}", flush=True)
-        if name == "aom":
-            if not archive.exists():
-                repository = work / "downloads/aom-git"
-                if not repository.exists():
-                    run(["git", "clone", "--depth=1", "--branch=v" + version, url, repository], work, log)
-                if capture("git", "-C", str(repository), "rev-parse", "HEAD") != expected:
-                    raise RuntimeError("AOM source revision differs from the pinned commit")
-                run(["git", "-C", repository, "archive", "--format=tar.gz", "--prefix=" + label + "/",
-                     "--output=" + str(archive), expected], work, log)
-            if digest(archive) != AOM_ARCHIVE_SHA256:
-                raise RuntimeError("AOM source archive checksum mismatch")
-        else:
-            if not archive.exists():
-                temporary = archive.with_suffix(archive.suffix + ".partial")
-                run(["curl", "--fail", "--location", "--retry", "3", "--output", temporary, url], work, log)
-                if digest(temporary) != expected:
-                    raise RuntimeError(f"Source checksum mismatch: {label}")
-                temporary.rename(archive)
-            if digest(archive) != expected:
-                raise RuntimeError(f"Cached source checksum mismatch: {label}")
+        archive_hash = AOM_ARCHIVE_SHA256 if name == "aom" else expected
+        if not archive.exists():
+            temporary = archive.with_suffix(archive.suffix + ".partial")
+            temporary.unlink(missing_ok=True)
+            run(["curl", "--fail", "--location", "--show-error", "--retry", "3",
+                 "--retry-all-errors", "--output", temporary,
+                 f"{SOURCE_ASSET_BASE}/{archive.name}"], work, log)
+            if digest(temporary) != archive_hash:
+                temporary.unlink()
+                raise RuntimeError(f"Source checksum mismatch: {label}")
+            temporary.rename(archive)
+        if digest(archive) != archive_hash:
+            raise RuntimeError(f"Cached source checksum mismatch: {label}")
         if not source.exists():
             source.mkdir()
             run(["tar", "-xf", archive, "-C", source, "--strip-components=1"], work, log)

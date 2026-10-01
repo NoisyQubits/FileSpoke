@@ -4,3 +4,4 @@ build/
 *.swiftdoc
 *.swiftmodule
 *.swiftsourceinfo
+__pycache__/
