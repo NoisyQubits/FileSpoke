@@ -163,49 +163,81 @@ private struct ImageFileWorkspaceView: View {
                 cropControls
                 Divider(); resizeControls
             }
-            if model.tool == .compress {
-                resizeControls
-                slider(l10n.s.mediaQuality, value: binding(\.quality, recordUndo: false), range: 0.05...1)
-                Toggle(l10n.s.mediaSizingFileSize, isOn: Binding(get: { model.edit.targetBytes > 0 }, set: { enabled in model.change { $0.targetBytes = enabled ? 10_000_000 : 0 } }))
-                if model.edit.targetBytes > 0 { TextField("MB", value: Binding(get: { Double(model.edit.targetBytes)/1_000_000 }, set: { value in model.change { $0.targetBytes = value.isFinite && value >= 0 && value <= 10000 ? Int64(value*1_000_000) : 0 } }), format: .number).accessibilityLabel(l10n.s.mediaSizingFileSize) }
-            }
-            if model.tool == .edit {
-                slider(strings[.exposure], value: binding(\.exposure, recordUndo: false), range: -3...3)
-                slider(strings[.brightness], value: binding(\.brightness, recordUndo: false), range: -1...1)
-                slider(strings[.contrast], value: binding(\.contrast, recordUndo: false), range: 0...3)
-                slider(strings[.saturation], value: binding(\.saturation, recordUndo: false), range: 0...3)
-                slider(strings[.sharpness], value: binding(\.sharpness, recordUndo: false), range: 0...2)
-                slider(strings[.noise], value: binding(\.noiseReduction, recordUndo: false), range: 0...0.1)
-                slider(strings[.dehaze], value: binding(\.dehaze, recordUndo: false), range: 0...1)
-                slider(strings[.clarity], value: binding(\.clarity, recordUndo: false), range: 0...1)
-                slider(strings[.grain], value: binding(\.grain, recordUndo: false), range: 0...1)
-            }
-            if model.tool == .redact {
-                Picker(strings[.redact], selection: $redactionStyle) {
-                    Text(strings[.solid]).tag(ImageRedactionStyle.solid); Text(strings[.blur]).tag(ImageRedactionStyle.blur); Text(strings[.pixelate]).tag(ImageRedactionStyle.pixelate)
-                }
-                ForEach(model.edit.redactions) { area in
-                    VStack(alignment: .leading) {
-                        HStack { Text(strings[area.style == .solid ? .solid : area.style == .blur ? .blur : .pixelate]); Spacer()
-                            Button(shared[.remove]) { model.change { $0.redactions.removeAll { $0.id == area.id } } }
-                        }
-                        redactionField(strings[.left], area: area, key: \.origin.x)
-                        redactionField(strings[.top], area: area, key: \.origin.y)
-                        redactionField(strings[.width], area: area, key: \.size.width)
-                        redactionField(imageStrings.height, area: area, key: \.size.height)
-                    }.padding(10).background(FileToolAppearance.card, in: RoundedRectangle(cornerRadius: 10))
-                }
-            }
-            if model.tool == .background || model.tool == .collage {
-                backgroundControls
-                integer(strings[.corners], value: binding(\.corner))
-                if model.tool == .background { integer(imageStrings.margin, value: binding(\.margin)); Toggle(strings[.shadow], isOn: binding(\.shadow)) }
-                else { Toggle(strings[.featured], isOn: binding(\.featured)); integer(strings[.width], value: binding(\.width)); integer(imageStrings.height, value: binding(\.height)); integer(strings[.columns], value: binding(\.columns)); integer(strings[.spacing], value: binding(\.spacing)) }
-            }
-            if model.tool != .pdf {
-                Picker(l10n.s.mediaOutput, selection: binding(\.format)) { ForEach(MediaImageFormat.allCases) { format in Text(format.fileExtension.uppercased()).tag(format) } }
-            }
+            if model.tool == .compress { compressControls }
+            if model.tool == .edit { editControls }
+            if model.tool == .redact { redactControls }
+            if model.tool == .background || model.tool == .collage { compositionControls }
+            if model.tool != .pdf { formatControls }
         }.textFieldStyle(.roundedBorder)
+    }
+    private var compressControls: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            resizeControls
+            slider(l10n.s.mediaQuality, value: binding(\.quality, recordUndo: false), range: 0.05...1)
+            Toggle(l10n.s.mediaSizingFileSize, isOn: Binding(get: { model.edit.targetBytes > 0 }, set: { enabled in model.change { $0.targetBytes = enabled ? 10_000_000 : 0 } }))
+            if model.edit.targetBytes > 0 {
+                TextField("MB", value: Binding(get: { Double(model.edit.targetBytes)/1_000_000 }, set: { value in model.change { $0.targetBytes = value.isFinite && value >= 0 && value <= 10000 ? Int64(value*1_000_000) : 0 } }), format: .number)
+                    .accessibilityLabel(l10n.s.mediaSizingFileSize)
+            }
+        }
+    }
+    private var editControls: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            slider(strings[.exposure], value: binding(\.exposure, recordUndo: false), range: -3...3)
+            slider(strings[.brightness], value: binding(\.brightness, recordUndo: false), range: -1...1)
+            slider(strings[.contrast], value: binding(\.contrast, recordUndo: false), range: 0...3)
+            slider(strings[.saturation], value: binding(\.saturation, recordUndo: false), range: 0...3)
+            slider(strings[.sharpness], value: binding(\.sharpness, recordUndo: false), range: 0...2)
+            slider(strings[.noise], value: binding(\.noiseReduction, recordUndo: false), range: 0...0.1)
+            slider(strings[.dehaze], value: binding(\.dehaze, recordUndo: false), range: 0...1)
+            slider(strings[.clarity], value: binding(\.clarity, recordUndo: false), range: 0...1)
+            slider(strings[.grain], value: binding(\.grain, recordUndo: false), range: 0...1)
+        }
+    }
+    private var redactControls: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Picker(strings[.redact], selection: $redactionStyle) {
+                Text(strings[.solid]).tag(ImageRedactionStyle.solid)
+                Text(strings[.blur]).tag(ImageRedactionStyle.blur)
+                Text(strings[.pixelate]).tag(ImageRedactionStyle.pixelate)
+            }
+            ForEach(model.edit.redactions) { area in
+                VStack(alignment: .leading) {
+                    HStack {
+                        Text(strings[area.style == .solid ? .solid : area.style == .blur ? .blur : .pixelate])
+                        Spacer()
+                        Button(shared[.remove]) { model.change { $0.redactions.removeAll { $0.id == area.id } } }
+                    }
+                    redactionField(strings[.left], area: area, key: \.origin.x)
+                    redactionField(strings[.top], area: area, key: \.origin.y)
+                    redactionField(strings[.width], area: area, key: \.size.width)
+                    redactionField(imageStrings.height, area: area, key: \.size.height)
+                }.padding(10).background(FileToolAppearance.card, in: RoundedRectangle(cornerRadius: 10))
+            }
+        }
+    }
+    private var compositionControls: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            backgroundControls
+            integer(strings[.corners], value: binding(\.corner))
+            if model.tool == .background {
+                integer(imageStrings.margin, value: binding(\.margin))
+                Toggle(strings[.shadow], isOn: binding(\.shadow))
+            } else {
+                Toggle(strings[.featured], isOn: binding(\.featured))
+                integer(strings[.width], value: binding(\.width))
+                integer(imageStrings.height, value: binding(\.height))
+                integer(strings[.columns], value: binding(\.columns))
+                integer(strings[.spacing], value: binding(\.spacing))
+            }
+        }
+    }
+    private var formatControls: some View {
+        Picker(l10n.s.mediaOutput, selection: binding(\.format)) {
+            ForEach(MediaImageFormat.allCases) { format in
+                Text(format.fileExtension.uppercased()).tag(format)
+            }
+        }
     }
     private func integer(_ label: String, value: Binding<Int>) -> some View { HStack { Text(label); Spacer(); TextField(label, value: value, format: .number).frame(width: 84) } }
     private func slider(_ label: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
