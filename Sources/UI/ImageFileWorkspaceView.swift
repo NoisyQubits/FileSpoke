@@ -49,6 +49,7 @@ private struct ImageFileWorkspaceView: View {
     @ObservedObject var model: ImageWorkspaceModel
     let close: () -> Void
     @ObservedObject private var l10n = L10n.shared
+    @ObservedObject private var appearance = AppearanceSettings.shared
     @State private var draft: CGRect?
     @State private var movingRedaction: UUID?
     @State private var redactionStyle = ImageRedactionStyle.solid
@@ -113,8 +114,8 @@ private struct ImageFileWorkspaceView: View {
                         .background(FileToolAppearance.accent, in: RoundedRectangle(cornerRadius: 9)).disabled(!model.isAvailable || model.preview == nil)
                 }
             }.padding(18)
-        }.foregroundStyle(.white).background(FileToolAppearance.base, in: RoundedRectangle(cornerRadius: 26))
-            .overlay(RoundedRectangle(cornerRadius: 26).stroke(Color.white.opacity(0.18), lineWidth: 1)).preferredColorScheme(.dark)
+        }.foregroundStyle(FileToolAppearance.foreground).background(FileToolAppearance.base, in: RoundedRectangle(cornerRadius: 26))
+            .overlay(RoundedRectangle(cornerRadius: 26).stroke(FileToolAppearance.border, lineWidth: 1)).preferredColorScheme(appearance.theme.scheme)
     }
     private var canvas: some View {
         GeometryReader { geometry in

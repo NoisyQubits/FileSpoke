@@ -47,6 +47,7 @@ private struct AVFileWorkspaceView: View {
     @ObservedObject var model: AVWorkspaceModel
     let close: () -> Void
     @ObservedObject private var l10n = L10n.shared
+    @ObservedObject private var appearance = AppearanceSettings.shared
     @State private var player = AVPlayer()
     @State private var playResult = false
     @State private var frameTime = 0.0
@@ -150,8 +151,8 @@ private struct AVFileWorkspaceView: View {
                         .background(FileToolAppearance.accent,in: RoundedRectangle(cornerRadius: 9)).disabled(!model.isAvailable || model.info == nil || timeValidity.values.contains(false))
                 }
             }.padding(18)
-        }.foregroundStyle(.white).background(FileToolAppearance.base,in: RoundedRectangle(cornerRadius: 26))
-            .overlay(RoundedRectangle(cornerRadius: 26).stroke(Color.white.opacity(0.18),lineWidth: 1)).preferredColorScheme(.dark)
+        }.foregroundStyle(FileToolAppearance.foreground).background(FileToolAppearance.base,in: RoundedRectangle(cornerRadius: 26))
+            .overlay(RoundedRectangle(cornerRadius: 26).stroke(FileToolAppearance.border,lineWidth: 1)).preferredColorScheme(appearance.theme.scheme)
             .onAppear { updatePlayer() }.onDisappear { player.pause() }
             .onChange(of: playResult) { _,_ in updatePlayer() }
             .onChange(of: model.inputs) { _,_ in updatePlayer() }

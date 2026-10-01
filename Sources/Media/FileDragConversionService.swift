@@ -5,6 +5,20 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
+fileprivate enum WheelMetrics {
+    static var scale: CGFloat { CGFloat(AppearanceSettings.shared.radialScale) }
+    static var fontScale: CGFloat { CGFloat(AppearanceSettings.shared.radialFontScale) }
+    static var disc: CGFloat { 300 * scale }
+    static var ring: CGFloat { 312 * scale }
+    static var wedgeFrame: CGFloat { 308 * scale }
+    static var inner: CGFloat { 60 * scale }
+    static var outer: CGFloat { 147 * scale }
+    static var labelRadius: CGFloat { 106 * scale }
+    static var deadZone: CGFloat { 58 * scale }
+    // Keeps the disc shadow within the transparent panel bounds.
+    static var panel: CGFloat { disc + 100 }
+}
+
 /// A passive monitor notices file drags and presents a native drag destination.
 /// No event is swallowed, and an ordinary drag without Shift is unaffected.
 final class FileDragConversionService: ObservableObject {
@@ -156,7 +170,7 @@ final class FileDragConversionService: ObservableObject {
         let panel = ensurePanel()
         status = nil
         selected = nil
-        let size = CGSize(width: 332, height: 332)
+        let size = CGSize(width: WheelMetrics.panel, height: WheelMetrics.panel)
         let pointer = NSEvent.mouseLocation
         let screen = NSScreen.screens.first(where: { $0.frame.contains(pointer) }) ?? NSScreen.main
         let visible = screen?.visibleFrame ?? CGRect(x: 0, y: 0, width: 800, height: 600)
@@ -210,7 +224,10 @@ final class FileDragConversionService: ObservableObject {
         panel.isReleasedWhenClosed = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         panel.registerForDraggedTypes([.fileURL])
-        panel.contentViewController = NSHostingController(rootView: FileDragConversionWheel(service: self))
+        let host = NSHostingController(rootView: FileDragConversionWheel(service: self))
+        host.view.wantsLayer = true
+        host.view.layer?.backgroundColor = NSColor.clear.cgColor
+        panel.contentViewController = host
         self.panel = panel
         return panel
     }
@@ -225,11 +242,11 @@ final class FileDragConversionService: ObservableObject {
         let center = CGPoint(x: window.frame.width / 2, y: window.frame.height / 2)
         let dx = location.x - center.x
         let dy = location.y - center.y
-        guard hypot(dx, dy) > 58, !actions.isEmpty else {
+        guard hypot(dx, dy) > WheelMetrics.deadZone, !actions.isEmpty else {
             return nil
         }
         guard let index = RadialMenuGeometry.highlightedIndex(dx: dx, dyUp: dy,
-                                                              deadZoneRadius: 58,
+                                                              deadZoneRadius: WheelMetrics.deadZone,
                                                               itemCount: actions.count) else {
             return nil
         }
@@ -292,9 +309,9 @@ private final class ConversionPanel: NSPanel, NSDraggingDestination {
 private struct FileDragConversionWheel: View {
     @ObservedObject var service: FileDragConversionService
     @ObservedObject private var l10n = L10n.shared
+    @ObservedObject private var appearance = AppearanceSettings.shared
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @AppStorage(DefaultsKey.liquidGlassEnabled) private var liquidGlassEnabled = false
 
     private var strings: FileDragStrings { .localized(l10n.language) }
     private var hasPDFTools: Bool { service.actions.contains { if case .pdfTool = $0 { return true }; return false } }
@@ -302,69 +319,59 @@ private struct FileDragConversionWheel: View {
 
     var body: some View {
         ZStack {
-            if !service.toolsMode { disc }
+            disc
             ForEach(Array(service.actions.enumerated()), id: \.element.id) { index, action in
                 let position = RadialMenuGeometry.unitPosition(index: index, itemCount: service.actions.count)
                 let highlighted = service.selected == action
                 FileToolWedge(centerAngle: 2 * .pi * Double(index) / Double(service.actions.count),
-                              sliceAngle: 2 * .pi / Double(service.actions.count), innerRadius: 60, outerRadius: 147)
-                    .fill(LinearGradient(colors: highlighted ? [FileToolAppearance.accent, Color(red: 0.85, green: 0.20, blue: 0)]
-                        : [Color(white: 0.20), Color(white: 0.14)], startPoint: .top, endPoint: .bottom))
+                              sliceAngle: 2 * .pi / Double(service.actions.count),
+                              innerRadius: WheelMetrics.inner, outerRadius: WheelMetrics.outer)
+                    .fill(LinearGradient(colors: highlighted ? [FileToolAppearance.accent, FileToolAppearance.accent.opacity(0.72)]
+                        : appearance.theme.wheelInactive, startPoint: .top, endPoint: .bottom))
                     .overlay(FileToolWedge(centerAngle: 2 * .pi * Double(index) / Double(service.actions.count),
-                                           sliceAngle: 2 * .pi / Double(service.actions.count), innerRadius: 60, outerRadius: 147)
-                        .stroke(PanelSurface.border(for: .dark), lineWidth: 1))
-                    .frame(width: 308, height: 308)
+                                           sliceAngle: 2 * .pi / Double(service.actions.count),
+                                           innerRadius: WheelMetrics.inner, outerRadius: WheelMetrics.outer)
+                        .stroke(FileToolAppearance.border, lineWidth: 1))
+                    .frame(width: WheelMetrics.wedgeFrame, height: WheelMetrics.wedgeFrame)
                 VStack(spacing: 5) {
-                    if case .pdfTool(let tool) = action { Image(systemName: tool.icon).font(.system(size: 17, weight: .medium)) }
-                    if case .imageTool(let tool) = action { Image(systemName: tool.icon).font(.system(size: 17, weight: .medium)) }
-                    if case .avTool(let tool) = action { Image(systemName: tool.icon).font(.system(size: 17, weight: .medium)) }
-                    if action == .moreTools { Image(systemName: "ellipsis.circle").font(.system(size:17,weight:.medium)) }
-                    if action == .metadata { Image(systemName: "tag").font(.system(size: 17, weight: .medium)) }
-                    if action == .extractArchive { Image(systemName: "archivebox").font(.system(size: 17, weight: .medium)) }
-                    Text(action.title(l10n.language).uppercased()).font(.system(size: 10, weight: .bold)).tracking(0.6)
+                    if case .pdfTool(let tool) = action { Image(systemName: tool.icon).font(.system(size: 17 * WheelMetrics.fontScale, weight: .medium)) }
+                    if case .imageTool(let tool) = action { Image(systemName: tool.icon).font(.system(size: 17 * WheelMetrics.fontScale, weight: .medium)) }
+                    if case .avTool(let tool) = action { Image(systemName: tool.icon).font(.system(size: 17 * WheelMetrics.fontScale, weight: .medium)) }
+                    if action == .moreTools { Image(systemName: "ellipsis.circle").font(.system(size:17 * WheelMetrics.fontScale,weight:.medium)) }
+                    if action == .metadata { Image(systemName: "tag").font(.system(size: 17 * WheelMetrics.fontScale, weight: .medium)) }
+                    if action == .extractArchive { Image(systemName: "archivebox").font(.system(size: 17 * WheelMetrics.fontScale, weight: .medium)) }
+                    Text(action.title(l10n.language).uppercased()).font(.system(size: 10 * WheelMetrics.fontScale, weight: .bold)).tracking(0.6 * WheelMetrics.fontScale)
                         .multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.7)
                 }
-                .foregroundStyle(.white).frame(width: 88, height: 54)
-                .offset(x: position.dx * 106, y: -position.dyUp * 106)
+                .foregroundStyle(FileToolAppearance.foreground)
+                .frame(width: 88 * max(1, WheelMetrics.fontScale), height: 54 * max(1, WheelMetrics.fontScale))
+                .offset(x: position.dx * WheelMetrics.labelRadius, y: -position.dyUp * WheelMetrics.labelRadius)
             }
             VStack(spacing: 2) {
                 if let selected = service.selected {
                     Text(selected.title(l10n.language).uppercased()).lineLimit(2).minimumScaleFactor(0.7)
                 } else {
                     Text(String(format: hasPDFTools ? pdfStrings[.pdfFiles] : strings.fileCountFormat, service.inputCount).uppercased())
-                    Text(ByteCountFormatter.string(fromByteCount: service.inputBytes, countStyle: .file)).foregroundStyle(.white.opacity(0.8))
+                    Text(ByteCountFormatter.string(fromByteCount: service.inputBytes, countStyle: .file)).foregroundStyle(FileToolAppearance.foreground.opacity(0.8))
                 }
             }
-            .font(.system(size: 10, weight: .bold)).tracking(0.5).multilineTextAlignment(.center)
-            .foregroundStyle(.white).frame(width: 96, height: 44)
-            .background(Color(white: 0.16).opacity(0.93), in: Capsule())
-            .overlay(Capsule().strokeBorder(Color.white.opacity(0.12), lineWidth: 1))
-            Circle().stroke(Color.white.opacity(0.15), lineWidth: 1).frame(width: 312, height: 312)
+            .font(.system(size: 10 * WheelMetrics.fontScale, weight: .bold)).tracking(0.5 * WheelMetrics.fontScale).multilineTextAlignment(.center)
+            .foregroundStyle(FileToolAppearance.foreground)
+            .frame(width: 96 * max(1, WheelMetrics.fontScale), height: 44 * max(1, WheelMetrics.fontScale))
+            .background(FileToolAppearance.card.opacity(0.93), in: Capsule())
+            .overlay(Capsule().strokeBorder(FileToolAppearance.border, lineWidth: 1))
+            Circle().stroke(FileToolAppearance.border, lineWidth: 1).frame(width: WheelMetrics.ring, height: WheelMetrics.ring)
         }
-        .frame(width: 332, height: 332)
-        .preferredColorScheme(.dark)
+        .frame(width: WheelMetrics.panel, height: WheelMetrics.panel)
+        .preferredColorScheme(appearance.theme.scheme)
         .accessibilityLabel(hasPDFTools ? pdfStrings[.dragHint] : strings.dropHint)
     }
 
-    @ViewBuilder private var disc: some View {
-#if compiler(>=6.2)
-        if #available(macOS 26.0, *), liquidGlassEnabled, !reduceTransparency {
-            Circle().fill(Color.clear).glassEffect(.regular, in: Circle())
-                .overlay(Circle().fill(PanelSurface.baseFill(for: colorScheme).opacity(0.4)))
-                .modifier(DiscRim(colorScheme: colorScheme))
-        } else {
-            standardDisc
-        }
-#else
-        standardDisc
-#endif
-    }
-
-    private var standardDisc: some View {
+    private var disc: some View {
         Circle().fill(reduceTransparency
-                      ? AnyShapeStyle(colorScheme == .light ? Color.white : Color.black)
+                      ? AnyShapeStyle(appearance.theme.base)
                       : AnyShapeStyle(.regularMaterial))
-            .overlay(Circle().fill(PanelSurface.baseFill(for: colorScheme)))
+            .overlay(Circle().fill(appearance.theme.base.opacity(reduceTransparency ? 0 : 0.30)))
             .modifier(DiscRim(colorScheme: colorScheme))
     }
 }
@@ -376,7 +383,7 @@ private struct DiscRim: ViewModifier {
         content
             .overlay(Circle().strokeBorder(PanelSurface.rimHighlight(for: colorScheme), lineWidth: 1.2))
             .overlay(Circle().strokeBorder(PanelSurface.border(for: colorScheme), lineWidth: 0.8))
-            .frame(width: 300, height: 300)
+            .frame(width: WheelMetrics.disc, height: WheelMetrics.disc)
             .shadow(color: .black.opacity(colorScheme == .light ? 0.22 : 0.55), radius: 24, y: 8)
     }
 }
@@ -391,7 +398,7 @@ private struct FileToolWedge: Shape {
         let center = CGPoint(x: rect.midX, y: rect.midY)
         let start = centerAngle - sliceAngle / 2 - .pi / 2 + 0.014
         let end = centerAngle + sliceAngle / 2 - .pi / 2 - 0.014
-        let corner: CGFloat = 10
+        let corner: CGFloat = 10 * WheelMetrics.scale
         let outerBend = Double(corner / outerRadius)
         let innerBend = Double(corner / innerRadius)
         func point(_ radius: CGFloat, _ angle: Double) -> CGPoint {

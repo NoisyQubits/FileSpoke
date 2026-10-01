@@ -103,9 +103,12 @@ final class FileToolPanel: OverlayPanel {
 }
 
 enum FileToolAppearance {
-    static let accent = Color(red: 1, green: 0.28, blue: 0)
-    static let base = Color(white: 0.15)
-    static let card = Color(white: 0.115)
+    static var accent: Color { AppearanceSettings.shared.theme.accent }
+    static var base: Color { AppearanceSettings.shared.theme.base }
+    static var card: Color { AppearanceSettings.shared.theme.card }
+    static var foreground: Color { AppearanceSettings.shared.theme.foreground }
+    static var border: Color { AppearanceSettings.shared.theme.border }
+    static var scheme: ColorScheme? { AppearanceSettings.shared.theme.scheme }
 }
 
 struct FileToolPanelDragHandle: NSViewRepresentable {
@@ -121,6 +124,7 @@ private struct PDFWorkspaceView: View {
     @ObservedObject var model: PDFWorkspaceModel
     var close: () -> Void
     @ObservedObject private var l10n = L10n.shared
+    @ObservedObject private var appearance = AppearanceSettings.shared
     @State private var dropTargeted = false
     private var strings: PDFToolStrings { .localized(l10n.language) }
 
@@ -131,7 +135,7 @@ private struct PDFWorkspaceView: View {
                 Text(strings.label(model.tool)).font(.system(size: 22, weight: .semibold)).allowsHitTesting(false)
                 HStack {
                     Button(action: close) { Image(systemName: "xmark").font(.system(size: 14, weight: .semibold)).frame(width: 32, height: 32) }
-                        .buttonStyle(.plain).background(Color.white.opacity(0.06), in: Circle())
+                        .buttonStyle(.plain).background(FileToolAppearance.card, in: Circle())
                         .overlay(Circle().strokeBorder(FileToolAppearance.accent.opacity(0.6), lineWidth: 2))
                         .accessibilityLabel(strings[.close]).keyboardShortcut(.cancelAction)
                     Spacer()
@@ -223,11 +227,12 @@ private struct PDFWorkspaceView: View {
                 }
             }.padding(16)
         }
+        .foregroundStyle(FileToolAppearance.foreground)
         .background(FileToolAppearance.base)
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).strokeBorder(dropTargeted ? FileToolAppearance.accent : PanelSurface.border(for: .dark), lineWidth: dropTargeted ? 2 : 1))
+        .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).strokeBorder(dropTargeted ? FileToolAppearance.accent : FileToolAppearance.border, lineWidth: dropTargeted ? 2 : 1))
         .onDrop(of: [.fileURL], isTargeted: $dropTargeted) { model.importDroppedPDFs($0) }
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(appearance.theme.scheme)
     }
 
     private var documentList: some View {

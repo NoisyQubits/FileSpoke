@@ -2,6 +2,7 @@
 // Copyright (C) 2026 NoisyQubits
 
 import AppKit
+import Combine
 import ImageIO
 import SwiftUI
 import UniformTypeIdentifiers
@@ -12,6 +13,8 @@ final class FileSpokeAppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var chooser: NSPanel?
     private var welcome: NSWindow?
+    private var appearancePanel: NSPanel?
+    private var iconSubscription: AnyCancellable?
     private var lastStatusWork: DispatchWorkItem?
 
     static func main() {
@@ -33,10 +36,12 @@ final class FileSpokeAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Self.shared = self
+        NSApp.appearance = nil
         UserDefaults.standard.register(defaults: [DefaultsKey.mediaDragConvertEnabled: true])
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "arrow.triangle.2.circlepath", accessibilityDescription: "FileSpoke")
-        statusItem.button?.image?.isTemplate = true
+        iconSubscription = AppearanceSettings.shared.$menuIcon.sink { [weak self] icon in
+            self?.setStatusIcon(icon)
+        }
         updateMenu()
         FileDragConversionService.shared.syncWithPreferences()
         if !UserDefaults.standard.bool(forKey: "FileSpoke.hasOpenedWelcome") {
@@ -54,6 +59,9 @@ final class FileSpokeAppDelegate: NSObject, NSApplicationDelegate {
         enabled.target = self
         enabled.state = UserDefaults.standard.bool(forKey: DefaultsKey.mediaDragConvertEnabled) ? .on : .off
         menu.addItem(enabled)
+        let appearance = NSMenuItem(title: "Preferences…", action: #selector(showAppearanceAction), keyEquivalent: "")
+        appearance.target = self
+        menu.addItem(appearance)
         let help = NSMenuItem(title: "How to Use FileSpoke…", action: #selector(showWelcomeAction), keyEquivalent: "")
         help.target = self
         menu.addItem(help)
@@ -74,6 +82,28 @@ final class FileSpokeAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func showWelcomeAction() { showWelcome() }
 
+    @objc private func showAppearanceAction() {
+        let panel = appearancePanel ?? NSPanel(contentRect: CGRect(x: 0, y: 0, width: 600, height: 500),
+                                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        panel.title = "Preferences"
+        panel.isReleasedWhenClosed = false
+        panel.level = .floating
+        panel.contentViewController = NSHostingController(rootView: FileSpokeAppearanceView { [weak self] in
+            self?.appearancePanel?.close()
+        })
+        panel.center()
+        appearancePanel = panel
+        NSApp.activate(ignoringOtherApps: true)
+        panel.makeKeyAndOrderFront(nil)
+    }
+
+    private func setStatusIcon(_ icon: FileSpokeMenuIcon) {
+        let image = NSImage(systemSymbolName: icon.symbol, accessibilityDescription: "FileSpoke")
+            ?? NSImage(systemSymbolName: FileSpokeMenuIcon.convert.symbol, accessibilityDescription: "FileSpoke")
+        image?.isTemplate = true
+        statusItem.button?.image = image
+    }
+
     private func showWelcome() {
         let window = welcome ?? NSWindow(contentRect: CGRect(x: 0, y: 0, width: 510, height: 360),
                                          styleMask: [.titled, .closable], backing: .buffered, defer: false)
@@ -82,6 +112,8 @@ final class FileSpokeAppDelegate: NSObject, NSApplicationDelegate {
         window.contentViewController = NSHostingController(rootView: FileSpokeWelcome(openFiles: { [weak self] in
             self?.welcome?.close()
             self?.chooseFiles()
+        }, openAppearance: { [weak self] in
+            self?.showAppearanceAction()
         }))
         window.center()
         welcome = window
@@ -158,6 +190,8 @@ final class FileSpokeAppDelegate: NSObject, NSApplicationDelegate {
 
 private struct FileSpokeWelcome: View {
     let openFiles: () -> Void
+    let openAppearance: () -> Void
+    @ObservedObject private var appearance = AppearanceSettings.shared
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Label("FileSpoke", systemImage: "circle.hexagongrid.fill")
@@ -170,6 +204,7 @@ private struct FileSpokeWelcome: View {
                 .foregroundStyle(.secondary)
             Spacer()
             HStack {
+                Button("Preferences…", action: openAppearance)
                 Spacer()
                 Button("Choose Files…", action: openFiles)
                     .buttonStyle(.borderedProminent)
@@ -177,6 +212,8 @@ private struct FileSpokeWelcome: View {
         }
         .padding(30)
         .frame(width: 510, height: 360)
+        .tint(appearance.theme.accent)
+        .preferredColorScheme(appearance.theme.scheme)
     }
 }
 
@@ -184,6 +221,7 @@ private struct FileSpokeChooser: View {
     let inputs: [URL]
     let actions: [FileDragAction]
     let select: (FileDragAction) -> Void
+    @ObservedObject private var appearance = AppearanceSettings.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -201,5 +239,7 @@ private struct FileSpokeChooser: View {
         }
         .padding(22)
         .frame(minWidth: 430, minHeight: 430)
+        .tint(appearance.theme.accent)
+        .preferredColorScheme(appearance.theme.scheme)
     }
 }

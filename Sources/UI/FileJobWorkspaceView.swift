@@ -32,6 +32,7 @@ private struct FileJobWorkspaceView: View {
     @ObservedObject var model: FileJobWorkspaceModel
     let close: () -> Void
     @ObservedObject private var l10n = L10n.shared
+    @ObservedObject private var appearance = AppearanceSettings.shared
     private var shared: PDFToolStrings { .localized(l10n.language) }
     private func timingField(_ key: FileToolExtraStrings.Key,value: Binding<Double>) -> some View {
         VStack(alignment:.leading) { Text(FileToolExtraStrings.localized(l10n.language)[key]).font(.caption); TextField("",value:value,format:.number).textFieldStyle(.roundedBorder).accessibilityLabel(FileToolExtraStrings.localized(l10n.language)[key]) }
@@ -90,6 +91,6 @@ private struct FileJobWorkspaceView: View {
                 else if model.completed == 0 && !model.hasFailures { Button(shared[.save]) { model.run() }.disabled(!model.isAvailable || model.needsTiming && !model.subtitleTiming.isValid) }
                 else if model.hasFailures { Button(l10n.s.mediaRunAgain) { model.run(retryFailures:true) }.disabled(!model.isAvailable) }
             }.padding(18)
-        }.foregroundStyle(.white).background(FileToolAppearance.base,in:RoundedRectangle(cornerRadius:26)).overlay(RoundedRectangle(cornerRadius:26).stroke(Color.white.opacity(0.18),lineWidth:1)).preferredColorScheme(.dark)
+        }.foregroundStyle(FileToolAppearance.foreground).background(FileToolAppearance.base,in:RoundedRectangle(cornerRadius:26)).overlay(RoundedRectangle(cornerRadius:26).stroke(FileToolAppearance.border,lineWidth:1)).preferredColorScheme(appearance.theme.scheme)
     }
 }

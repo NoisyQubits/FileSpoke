@@ -37,6 +37,7 @@ private struct FileMetadataWorkspaceView: View {
     @ObservedObject var model: FileMetadataWorkspaceModel
     let close: () -> Void
     @ObservedObject private var l10n = L10n.shared
+    @ObservedObject private var appearance = AppearanceSettings.shared
     @State private var newKey = ""
     @State private var newValue = ""
     @State private var selectedSection = "file"
@@ -89,6 +90,6 @@ private struct FileMetadataWorkspaceView: View {
                 if model.busy { Button(shared[.cancel]) { model.cancel() } }
                 else { Toggle(strings[.remove],isOn:$remove); Button(shared[.save]) { model.save(remove:remove) }.buttonStyle(.plain).padding(.horizontal,18).padding(.vertical,10).background(FileToolAppearance.accent,in:RoundedRectangle(cornerRadius:9)).disabled(model.snapshot == nil || !model.isAvailable) }
             }.padding(18)
-        }.foregroundStyle(.white).background(FileToolAppearance.base,in:RoundedRectangle(cornerRadius:26)).overlay(RoundedRectangle(cornerRadius:26).stroke(Color.white.opacity(0.18),lineWidth:1)).preferredColorScheme(.dark)
+        }.foregroundStyle(FileToolAppearance.foreground).background(FileToolAppearance.base,in:RoundedRectangle(cornerRadius:26)).overlay(RoundedRectangle(cornerRadius:26).stroke(FileToolAppearance.border,lineWidth:1)).preferredColorScheme(appearance.theme.scheme)
     }
 }

@@ -51,6 +51,7 @@ private struct FileToolCatalogView: View {
     let select: (FileDragAction) -> Void
     let close: () -> Void
     @ObservedObject private var l10n = L10n.shared
+    @ObservedObject private var appearance = AppearanceSettings.shared
     var body: some View {
         VStack(spacing:0) {
             FileCatalogHeader(title:FileToolExtraStrings.localized(l10n.language)[.more],close:close)
@@ -59,7 +60,7 @@ private struct FileToolCatalogView: View {
             ScrollView { LazyVGrid(columns:[GridItem(.flexible()),GridItem(.flexible())],spacing:12) {
                 ForEach(actions) { action in Button(action.title(l10n.language)) { select(action) }.buttonStyle(.plain).padding(18).frame(maxWidth:.infinity,minHeight:64).background(FileToolAppearance.card,in:RoundedRectangle(cornerRadius:14)) }
             }.padding(18) }
-        }.foregroundStyle(.white).background(FileToolAppearance.base,in:RoundedRectangle(cornerRadius:26)).overlay(RoundedRectangle(cornerRadius:26).stroke(Color.white.opacity(0.18),lineWidth:1)).preferredColorScheme(.dark)
+        }.foregroundStyle(FileToolAppearance.foreground).background(FileToolAppearance.base,in:RoundedRectangle(cornerRadius:26)).overlay(RoundedRectangle(cornerRadius:26).stroke(FileToolAppearance.border,lineWidth:1)).preferredColorScheme(appearance.theme.scheme)
     }
 }
 private struct FileCatalogHeader: View {
@@ -100,6 +101,7 @@ private struct ImageQRWorkspaceView: View {
     @ObservedObject var model: ImageQRWorkspaceModel
     let close: () -> Void
     @ObservedObject private var l10n = L10n.shared
+    @ObservedObject private var appearance = AppearanceSettings.shared
     var body: some View {
         let strings = PDFToolStrings.localized(l10n.language)
         VStack(spacing:0) {
@@ -110,6 +112,6 @@ private struct ImageQRWorkspaceView: View {
                 else if model.results.isEmpty { Text(strings[.noQR]).foregroundStyle(.secondary) }
                 ForEach(model.results,id:\.self) { payload in HStack { Text(payload).textSelection(.enabled); Spacer(); Button(strings[.copy]) { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(payload,forType:.string) } }.padding(14).background(FileToolAppearance.card,in:RoundedRectangle(cornerRadius:12)) }
             }.padding(18) } }
-        }.foregroundStyle(.white).background(FileToolAppearance.base,in:RoundedRectangle(cornerRadius:26)).overlay(RoundedRectangle(cornerRadius:26).stroke(Color.white.opacity(0.18),lineWidth:1)).preferredColorScheme(.dark)
+        }.foregroundStyle(FileToolAppearance.foreground).background(FileToolAppearance.base,in:RoundedRectangle(cornerRadius:26)).overlay(RoundedRectangle(cornerRadius:26).stroke(FileToolAppearance.border,lineWidth:1)).preferredColorScheme(appearance.theme.scheme)
     }
 }

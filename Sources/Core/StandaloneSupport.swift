@@ -35,6 +35,9 @@ final class L10n: ObservableObject {
 enum DefaultsKey {
     static let mediaDragConvertEnabled = "FileSpoke.shiftDragEnabled"
     static let liquidGlassEnabled = "FileSpoke.liquidGlassEnabled"
+    static let menuBarIcon = "FileSpoke.menuBarIcon"
+    static let radialScale = "FileSpoke.radialScale"
+    static let radialFontScale = "FileSpoke.radialFontScale"
 }
 
 enum AppFeature {

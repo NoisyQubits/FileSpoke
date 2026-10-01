@@ -25,6 +25,11 @@ macOS Accessibility permission for FileSpoke. Grant it in System Settings →
 Privacy & Security → Accessibility, then relaunch FileSpoke. Ordinary drags are
 untouched. Turn the gesture off from the FileSpoke menu bar menu at any time.
 
+Choose **Preferences…** from the menu bar menu to adjust the Finder radial menu
+and its labels independently. FileSpoke always follows macOS's appearance and
+accent color. The same panel offers four monochrome menu bar icons: Convert,
+Spokes, Documents, and Layers. Choices are saved locally.
+
 The first release is ad hoc signed, not Apple notarized. If Gatekeeper asks for
 confirmation, use Finder's **Open** command on the app and review its publisher
 and source; do not remove macOS quarantine globally.
