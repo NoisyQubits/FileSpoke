@@ -300,10 +300,12 @@ enum PDFTools {
     }
 
     private static func renderImage(_ page: PDFPage) throws -> CGImage {
-        let bounds = page.bounds(for: .mediaBox)
+        let bounds = page.bounds(for: .cropBox)
+        let scale: CGFloat = 300 / 72
         let swapped = abs(page.rotation) % 180 != 0
-        let size = CGSize(width: (swapped ? bounds.height : bounds.width) * 300 / 72,
-                          height: (swapped ? bounds.width : bounds.height) * 300 / 72)
+        let pageSize = CGSize(width: swapped ? bounds.height : bounds.width,
+                              height: swapped ? bounds.width : bounds.height)
+        let size = CGSize(width: pageSize.width * 300 / 72, height: pageSize.height * 300 / 72)
         guard MediaSupport.imageRenderSizeIsSafe(size),
               let context = CGContext(data: nil, width: Int(ceil(size.width)), height: Int(ceil(size.height)),
                                       bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
@@ -311,10 +313,14 @@ enum PDFTools {
               let reference = page.pageRef else { throw CocoaError(.fileReadTooLarge) }
         let canvas = CGRect(x: 0, y: 0, width: context.width, height: context.height)
         context.setFillColor(NSColor.white.cgColor); context.fill(canvas)
-        context.concatenate(reference.getDrawingTransform(.mediaBox, rect: canvas, rotate: 0, preserveAspectRatio: true))
+        // Scale explicitly: the PDF drawing transform can leave an enlarged canvas at 1x.
+        context.scaleBy(x: scale, y: scale)
+        context.concatenate(reference.getDrawingTransform(.cropBox, rect: CGRect(origin: .zero, size: pageSize),
+                            rotate: Int32(page.rotation) - reference.rotationAngle, preserveAspectRatio: true))
+        context.clip(to: bounds)
         context.drawPDFPage(reference)
         for annotation in page.annotations where annotation.shouldDisplay {
-            annotation.draw(with: .mediaBox, in: context)
+            annotation.draw(with: .cropBox, in: context)
         }
         guard let image = context.makeImage() else { throw CocoaError(.fileReadCorruptFile) }
         return image
@@ -337,7 +343,7 @@ enum PDFTools {
             if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 let name = "page\(index + 1).png"
                 try writeImage(page, to: word.appendingPathComponent("media/" + name), format: .png)
-                let box = page.bounds(for: .mediaBox)
+                let box = page.bounds(for: .cropBox)
                 let aspect = abs(page.rotation) % 180 == 0 ? box.height / max(1, box.width) : box.width / max(1, box.height)
                 let width = 5_486_400, height = Int(Double(width) * aspect)
                 relationships += "<Relationship Id=\"image\(index)\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\" Target=\"media/\(name)\"/>"
